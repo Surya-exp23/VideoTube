@@ -1,6 +1,4 @@
-   //!  Hints
-   
-   /*
+    /*
    id string pk
     owner ObjectId users
     videos ObjectId[] videos
@@ -30,13 +28,17 @@ const playlistSchema= new Schema({
         required: true
     },
     owner:{
-        type: Schema.type.ObjectId,
+        type: Schema.Types.ObjectId,
         ref:"User"
     },
     videos:{
-        type:Schema.type.ObjectId,
+        type:Schema.Types.ObjectId,
         ref:"video"
     }
-})
+},{
+    timestamps: true
+}
+
+)
 
 export const playlist = mongoose.model("Playlist",playlistSchema)
