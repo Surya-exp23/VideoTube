@@ -45,7 +45,8 @@ const userSchema = new Schema(
 
 userSchema.pre("save", async function (next){
 
-    if(!this.modified("password")) return next()
+    
+    if(!this.ismodified("password")) return next()
 
     this.password=bcrypt.hash(this.password, 10)  //number of routes
 
