@@ -5,6 +5,25 @@ import {uploadOnCloudinary, deleteFromCloudinary} from "../utils/cloudinary.js";
 import { urlencoded } from "express";
 import { ApiResponse } from "../utils/apiResponse.js";
 
+
+
+const generateAccessTokenAndRefreshToken = async (userId) => {
+    try {
+        const user = await User.findById(userId)
+        // small check we will do later
+    
+        const accessToken=user.generateAccessToken()
+        const refreshToken =user.generateRefreshToken()
+    
+        user.refreshToken = refreshToken
+        await user.save({validatBeforeSave: false})
+        return { accessToken, refreshToken }
+    } catch (error) {
+        throw new ApiError(500, "something went wrong while generating access and refresh tokens")
+    }
+}
+
+
 const registerUser = asyncHandler(async (req,res)=>{
 
     const {fullname, email, username, password}=req.body
@@ -92,6 +111,59 @@ const registerUser = asyncHandler(async (req,res)=>{
 
 })
 
+
+const loginUser = asyncHandler(async (req,res) =>{
+    // get data from body
+    const {email ,username, password} = req.body
+
+    // validation
+    if(!email){
+        throw new ApiError(400, "email is required");
+    }
+
+    const user=User.findOne({
+        $or: [{username},{email}] 
+    })
+
+    if(!user){
+        throw new ApiError(404,"User not found")
+    }
+
+
+    //validation  password
+
+    const isPasswordValid =  await user.isPasswordCorrect(password)
+    if(!isPasswordValid){
+        throw new ApiError(401, "Give the correct password");
+    }
+
+    const {accessToken , refreshToken } = await generateAccessTokenAndRefreshToken(user._id);
+
+
+    const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
+
+    if(!loggedInUser){
+        throw new ApiError(401, "User not found");
+    }
+
+    const options = {
+        httpOnly: true,
+        secure: process.env.NODE_ENV==="production"
+    }
+
+
+    return res
+        .status(200)
+        .cookie("accesssToken", accessToken, options)
+        .cookie("refreshToken", refreshToken, options)
+        .json( new ApiResponse(200, 
+            { user: loggedInUser, accessToken: refreshToken }, 
+            "User logged in successfully"
+        ))
+
+})
+
 export{
-    registerUser
+    registerUser,
+    loginUser
 }
