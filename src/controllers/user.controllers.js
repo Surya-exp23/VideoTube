@@ -166,8 +166,24 @@ const loginUser = asyncHandler(async (req,res) =>{
 // now logout feature implementation
 const logoutUser = asyncHandler(async (req,res) =>{
     await User.findByIdAndUpdate(
-        // later part 
+        req.user._id,
+        {
+            $set:{
+                refreshToken: undefined,
+            }
+        },
+        {new: true}
     )
+    const options={
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+    }
+
+    return res
+        .status(200)
+        .clearcookies("accessToken", options)
+        .clearcookies("refreshToken", options)
+        .json(new ApiResponse(200, {}, "User logged out successfully"))
 })
 
 
@@ -226,5 +242,6 @@ const refreshAccessToken = asyncHandler( async( req, res) =>{
 export{
     registerUser,
     loginUser,
-    refreshAccessToken
+    refreshAccessToken,
+    logoutUser
 }
