@@ -239,9 +239,114 @@ const refreshAccessToken = asyncHandler( async( req, res) =>{
 })
 
 
+const changecurrentPassword = asyncHandler(async(req,res)=>{
+    const {oldPassword, newPassword} = req.body
+    const user = await User.findById(req.user?._id)
+
+    const isPasswordValid = await user.isPasswordCorrect(oldPassword)
+
+    if(!isPasswordValid){
+        throw new ApiError(401, "Old password is incorrect");
+    }
+
+    user.password = newPassword;
+
+    await user.save({ validateBeforeSave: false })
+
+    return res.status(200).json(new ApiResponse(200, {}, "Password changed successfully"))
+
+})
+
+const getCurrentUser = asyncHandler(async(req,res)=>{
+    return res.status(200).json(new ApiResponse(200, req.user, "Current user details"))
+})
+
+const updateAccountDetails = asyncHandler(async(req,res)=>{
+    const {fullname, email} = req.body
+    if(!fullname || !email ){
+        throw new ApiError(400, "Fullname and email are required")
+    }
+
+    const user = await User.findByIdAndUpdate(
+        req.user?._id,
+        {
+            $set:{
+                fullname,
+                email: email
+            }
+        },
+        {new: true}   //By default, findOneAndUpdate() returns the document as it was before update was applied. If you set new: true, findOneAndUpdate() will instead give you the object after update was applied. Use returnDocument: 'after' instead of new: true, or returnDocument: 'before' instead of new: false.
+
+
+    ).select("-password -refreshToken")
+
+    return res.status(200).json(new ApiResponse(200, user, "account details updated succesfully"));
+
+})
+
+const updateUserAvatar = asyncHandler(async(req,res)=>{
+    const avatarLocalPath = req.files?.path 
+
+    if(!avatarLocalPath){
+        throw new ApiError(400, "File is required")
+    }
+
+    const avatar = await uploadOnCloudinary(avatarLocalPath)
+
+    if(!avatar.url){
+        throw new ApiError(500, "Something went wrong while uploading the avatar")
+    }
+
+    const user = await User.findByIdAndUpdate(
+        req.user?._id,
+        {
+            $set:{
+                avatar: avatar.url
+            }
+        },
+        {new: true}
+    ).select("-password -refreshToken")
+
+    return res.status(200).json(new ApiResponse(200, user, "avatar updated succesfully"));
+})
+
+const updateUserCoverImage = asyncHandler(async(req,res)=>{
+    const coverImageLocalPath = req.file?.path
+
+    if(!coverImageLocalPath){
+        throw new ApiError(400, "file is required")
+    }
+
+    const coverImage = await uploadOnCloudinary(coverImageLocalPath);
+
+    if(!coverImage.url){
+        throw new ApiError(500, "something went wrong while uploading cover image")
+    }
+
+    const user = await User.findByIdAndUpdate(
+        req.user?._id,
+        {
+            $set:{
+                coverImage: coverImage.url
+            }
+        },
+        {new: true}
+
+    ).select("-password -refreshToken")
+
+    return res.status(200).json(new ApiResponse(200, user, "Cover Image succesfully"));
+
+})
+
+
 export{
     registerUser,
     loginUser,
     refreshAccessToken,
-    logoutUser
+    logoutUser,
+    changecurrentPassword,
+    getCurrentUser,
+    updateAccountDetails,
+    updateUserAvatar,
+    updateUserCoverImage
 }
