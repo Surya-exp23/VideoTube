@@ -31,10 +31,10 @@ const playlistSchema= new Schema({
         type: Schema.Types.ObjectId,
         ref:"User"
     },
-    videos:{
+    videos:[{
         type:Schema.Types.ObjectId,
-        ref:"video"
-    }
+        ref:"Video"
+    }]
 },{
     timestamps: true
 }
