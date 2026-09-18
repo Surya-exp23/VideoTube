@@ -16,7 +16,7 @@ const generateAccessTokenAndRefreshToken = async (userId) => {
         const refreshToken =user.generateRefreshToken()
     
         user.refreshToken = refreshToken
-        await user.save({validatBeforeSave: false})
+        await user.save({validateBeforeSave: false})
         return { accessToken, refreshToken }
     } catch (error) {
         throw new ApiError(500, "something went wrong while generating access and refresh tokens")
@@ -33,7 +33,7 @@ const registerUser = asyncHandler(async (req,res)=>{
         throw new ApiError(400,"All fields are required")
     }
 
-    const existedUser=User.findOne({
+    const existedUser=await User.findOne({
         $or: [{username},{email}] // good method to check for mutliple things in mongodb
     })
 
@@ -41,48 +41,37 @@ const registerUser = asyncHandler(async (req,res)=>{
         throw new ApiError(409,"user with email or username already exists")
     }
 
-   console.warn(req.files);
-   const avatarLocalPath = req.files?.avatar?.[0]?.path
-   const coverLocalPath = req.files?.coverImage?.[0]?.path
+   const avatarLocalPath = req.files?.avatar?.[0]?.path;
+   const coverLocalPath = req.files?.coverImage?.[0]?.path;
 
-   if(!avatarLocalPath){
-    throw new ApiError(400,"Avatar file is required")
+   let avatar = null;
+   if (avatarLocalPath) {
+       try {
+            avatar = await uploadOnCloudinary(avatarLocalPath);
+            if (!avatar) throw new Error("Cloudinary upload returned null");
+       } catch(error) {
+            console.log("Error uploading avatar", error);
+            throw new ApiError(500, "Cloudinary upload failed for avatar.");
+       }
    }
 
-//    const avatar=await uploadOnCloudinary(avatarLocalPath)
-//    let coverImage="";
-//    if(coverLocalPath){
-//        coverImage = await uploadOnCloudinary(coverLocalPath)
-//    }
-
-   let avatar;
-   try {
-        avatar=await uploadOnCloudinary(avatarLocalPath)
-        console.log("Upload avatar", avatar);
-   }catch(error){
-        console.log("Error uploading avatar",error)
-        throw new ApiError(500, "failed to upload");
+   let coverImage = null;
+   if (coverLocalPath) {
+       try {
+            coverImage = await uploadOnCloudinary(coverLocalPath);
+       } catch(error) { 
+            console.log("Error uploading coverimage", error);
+       }
    }
-
-
-   let coverImage;
-   try {
-        coverImage = await uploadOnCloudinary(coverLocalPath)
-        console.log("Upload avatar", coverImage);
-   }catch(error){ 
-        console.log("Error uploading coverimage",error)
-        throw new ApiError(500, "failed to upload");
-   }
-
 
    try {
     const user=await User.create({
      fullname,
-     avatar: avatar.url,
+     avatar: avatar?.url || "",
      coverImage: coverImage?.url || "",
      email,
      password,
-     username: username.tolowercase()
+     username: username.toLowerCase()
     })
  
  
@@ -94,9 +83,9 @@ const registerUser = asyncHandler(async (req,res)=>{
      throw new ApiError(500,"Something went wrong")
     }
  
-    return res.status(2001).json(new ApiResponse(200, createdUser, "user registered succesfully"))
+    return res.status(201).json(new ApiResponse(200, createdUser, "user registered succesfully"))
    } catch (error) {
-    console.log("user creation is failed");
+    console.log("user creation is failed", error);
     if(avatar){
         await deleteFromCloudinary(avatar.public_id)
     }
@@ -104,7 +93,7 @@ const registerUser = asyncHandler(async (req,res)=>{
         await deleteFromCloudinary(coverImage.public_id)
     }
 
-    throw new ApiError(500,"Something went wrong")
+    throw new ApiError(500, error?.message || "Something went wrong")
    }
 
 
@@ -121,7 +110,7 @@ const loginUser = asyncHandler(async (req,res) =>{
         throw new ApiError(400, "email is required");
     }
 
-    const user=User.findOne({
+    const user=await User.findOne({
         $or: [{username},{email}] 
     })
 
@@ -154,10 +143,10 @@ const loginUser = asyncHandler(async (req,res) =>{
 
     return res
         .status(200)
-        .cookie("accesssToken", accessToken, options)
+        .cookie("accessToken", accessToken, options)
         .cookie("refreshToken", refreshToken, options)
         .json( new ApiResponse(200, 
-            { user: loggedInUser, accessToken: refreshToken }, 
+            { user: loggedInUser, accessToken, refreshToken }, 
             "User logged in successfully"
         ))
 
@@ -181,8 +170,8 @@ const logoutUser = asyncHandler(async (req,res) =>{
 
     return res
         .status(200)
-        .clearcookies("accessToken", options)
-        .clearcookies("refreshToken", options)
+        .clearCookie("accessToken", options)
+        .clearCookie("refreshToken", options)
         .json(new ApiResponse(200, {}, "User logged out successfully"))
 })
 
@@ -199,7 +188,7 @@ const refreshAccessToken = asyncHandler( async( req, res) =>{
     try {
         const decodedToken = jwt.verify(
             incomingRefreshToken,
-            process.env.REFRESH_WEB_TOKEN
+            process.env.REFRESH_TOKEN_SECRET
         )
         const user= await User.findById(decodedToken?._id) // here ? is optentional chaining operator which will check if decodedToken is not null or undefined then only it will access _id property
 
@@ -293,8 +282,8 @@ const updateUserAvatar = asyncHandler(async(req,res)=>{
 
     const avatar = await uploadOnCloudinary(avatarLocalPath)
 
-    if(!avatar.url){
-        throw new ApiError(500, "Something went wrong while uploading the avatar")
+    if(!avatar || !avatar.url){
+        throw new ApiError(500, "Something went wrong while uploading the avatar to Cloudinary. Check your Cloudinary keys.")
     }
 
     const user = await User.findByIdAndUpdate(
@@ -319,8 +308,8 @@ const updateUserCoverImage = asyncHandler(async(req,res)=>{
 
     const coverImage = await uploadOnCloudinary(coverImageLocalPath);
 
-    if(!coverImage.url){
-        throw new ApiError(500, "something went wrong while uploading cover image")
+    if(!coverImage || !coverImage.url){
+        throw new ApiError(500, "Something went wrong while uploading cover image to Cloudinary. Check your Cloudinary keys.")
     }
 
     const user = await User.findByIdAndUpdate(
