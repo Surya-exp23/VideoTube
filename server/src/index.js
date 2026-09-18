@@ -12,14 +12,16 @@ dotenv.config({
 
 const PORT = process.env.PORT || 5000
 
+import { logger } from './utils/logger.js';
+
 connectDB().
 then(()=>{
     app.listen(PORT,()=>{
-        console.log(`console is running on port: ${PORT}`)
+        logger.info(`Server is running on port: ${PORT}`)
     })
 })
 .catch((err)=>{
-    console.log("mongodb is not working error", err)
+    logger.error("mongodb is not working error", err)
 })
 
 

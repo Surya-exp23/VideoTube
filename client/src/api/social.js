@@ -38,6 +38,7 @@ export const playlistApi = {
 }
 
 export const tweetApi = {
+  getAll: () => api.get('/tweets'),
   create: (data) => api.post('/tweets', data),
   getUserTweets: (userId) => api.get(`/tweets/user/${userId}`),
   update: (tweetId, data) => api.patch(`/tweets/${tweetId}`, data),

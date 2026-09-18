@@ -121,9 +121,8 @@ export default function TweetsPage() {
   const [content, setContent] = useState('')
 
   const { data: tweets, isLoading } = useQuery({
-    queryKey: ['tweets', user?._id],
-    queryFn: () => tweetApi.getUserTweets(user._id).then((r) => r.data.data),
-    enabled: !!user,
+    queryKey: ['tweets'],
+    queryFn: () => tweetApi.getAll().then((r) => r.data.data),
     staleTime: 2 * 60 * 1000,
   })
 
